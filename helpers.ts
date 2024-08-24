@@ -5,7 +5,7 @@ export interface ITicketSale {
 }
 
 export interface IChargesMetadata  {
-    el: string;
+    event_label: string;
     tm: string;
     [key: string]: any;
 } 
@@ -54,7 +54,7 @@ export function deserializeTicketMetadata(serializedTicketMetadata: string): ITi
 
 export function ticketSaleToChargeMetadata(ticketSale: ITicketSale): IChargesMetadata {
     return {
-        el: ticketSale.eventLabel,
+        event_label: ticketSale.eventLabel,
         tm: serializeTicketMetadata(ticketSale.ticketMetadata)
     }
 }
