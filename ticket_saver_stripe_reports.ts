@@ -1,38 +1,8 @@
 import Stripe from "stripe";
 import fs from "fs";
 import { Money, CurrencyCode } from "./money";
+import { ReportResult, IChargesMetadata, ITicketMetadata, deserializeTicketMetadata, ticketSaleToChargeMetadata, chargeMetadataToTicketSale } from "./helpers";
 
-interface IChargesMetadata {
-    event_label: string;
-    ticket_metadata: string
-}
-
-interface ITicketMetadata {
-    seat: string;
-    zone: string;
-    price_type: string;
-    base_price_major_units: number;
-    comp: boolean;
-}
-
-// All Amounts are in localized currency. for example, $10.00 for en_US or 10.00€ for fr_FR
-interface ReportResult {
-    currency: string,
-    eventLabel: string,
-    totalTicketsCount: number,
-    chargesRefundedCount: number,
-    totalChargedAmount: string,
-    totalChargedBaseAmount: string,
-    totalsByTicketType: {
-        [price_type: string]: {
-            basePrice: string,
-            ticketCount: number,
-            totalAmount: string,
-            netAmount: string,
-            compsCount: number,
-        }
-    }
-}
 
 async function getChargesWithMetadataMock(
     file: string,
@@ -96,18 +66,18 @@ function processChargesWithMetadata(
             continue;
         }
 
-        if (metadata.ticket_metadata === undefined) {
+        if (metadata.tm === undefined) {
             console.log(`charge ${charge.id} has no ticket_metadata`);
             continue;
         }
 
         totalAmountCharged += charge.amount;
-        const ticketMetadata = JSON.parse(metadata.ticket_metadata) as ITicketMetadata[];
-        ticketMetadata.sort((a, b) => a.base_price_major_units - b.base_price_major_units);
+        const ticketMetadata = chargeMetadataToTicketSale(metadata).ticketMetadata;
+        ticketMetadata.sort((a, b) => a.basePriceMajorUnits - b.basePriceMajorUnits);
         for (const ticket of ticketMetadata) {
-            const basePrice = Money.fromMajor(ticket.base_price_major_units, currency);
-            if (!totalsByTicketTypeAtomic[ticket.price_type]) {
-                totalsByTicketTypeAtomic[ticket.price_type] = {
+            const basePrice = Money.fromMajor(ticket.basePriceMajorUnits, currency);
+            if (!totalsByTicketTypeAtomic[ticket.priceType]) {
+                totalsByTicketTypeAtomic[ticket.priceType] = {
                     basePriceAtomic: basePrice.atomicUnits,
                     compsCount: 0,
                     ticketCount: 0,
@@ -116,12 +86,12 @@ function processChargesWithMetadata(
                 };
             }
             totalTicketsCount++;
-            totalsByTicketTypeAtomic[ticket.price_type].ticketCount++;
-            totalsByTicketTypeAtomic[ticket.price_type].totalAtomic += basePrice.atomicUnits;
+            totalsByTicketTypeAtomic[ticket.priceType].ticketCount++;
+            totalsByTicketTypeAtomic[ticket.priceType].totalAtomic += basePrice.atomicUnits;
             if (ticket.comp) {
-                totalsByTicketTypeAtomic[ticket.price_type].compsCount++;
+                totalsByTicketTypeAtomic[ticket.priceType].compsCount++;
             } else {
-                totalsByTicketTypeAtomic[ticket.price_type].netAtominc += basePrice.atomicUnits;
+                totalsByTicketTypeAtomic[ticket.priceType].netAtominc += basePrice.atomicUnits;
             }
             totalAmountChargedBaseAtomic += basePrice.atomicUnits;
         }
@@ -176,9 +146,17 @@ function exportReportResult(report: ReportResult): string {
     return output;
 }
 
+function generateReportTxt(stripe:Stripe, eventLabel:string){
+    const EVENT_LABEL_KEY: keyof IChargesMetadata = 'el';
+    // switch to getChargesByMetadata when ready
+    const charges = getChargesWithMetadataMock('charges-dryrun.json', EVENT_LABEL_KEY, eventLabel);
+    // const charges = getChargesByMetadata(stripe, EVENT_LABEL_KEY, eventLabel);
+}
+
+
 // Example usage
 (async () => {
-    const eventLabelKey = 'event_label';
+    const eventLabelKey = 'el';
     const eventLabel = 'india_yuridia.01';
     // replace with getChargesByMetadata when ready
     // const charges = await getChargesByMetadata(stripe, eventLabelKey, eventLabel);
