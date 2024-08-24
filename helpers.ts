@@ -17,7 +17,6 @@ export interface ITicketMetadata {
     comp: boolean;
 }
 
-
 // All Amounts are in localized currency. for example, $10.00 for en_US or 10.00€ for fr_FR
 export interface ReportResult {
     currency: string,
@@ -37,7 +36,6 @@ export interface ReportResult {
     }
 }
 
-
 export function serializeTicketMetadata(ticketMetadataList: ITicketMetadata[]): string {
     return ticketMetadataList.map((ticketMetadata) => `${ticketMetadata.seat},${ticketMetadata.priceType},${ticketMetadata.basePriceMajorUnits},${ticketMetadata.comp ? 1 : 0}`).join(";");
 }
@@ -54,7 +52,6 @@ export function deserializeTicketMetadata(serializedTicketMetadata: string): ITi
     });
 }
 
-
 export function ticketSaleToChargeMetadata(ticketSale: ITicketSale): IChargesMetadata {
     return {
         el: ticketSale.eventLabel,
@@ -68,8 +65,6 @@ export function chargeMetadataToTicketSale(metadata: IChargesMetadata): ITicketS
         ticketMetadata: deserializeTicketMetadata(metadata.tm)
     }
 }
-
-
 // tests
 function testSerializeDeserializeTicketMetadata() {
     const ticketMetadataList: ITicketMetadata[] = [{
