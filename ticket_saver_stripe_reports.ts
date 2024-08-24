@@ -12,6 +12,7 @@ interface ITicketMetadata {
     zone: string;
     price_type: string;
     base_price_major_units: number;
+    comp: boolean;
 }
 
 // All Amounts are in localized currency. for example, $10.00 for en_US or 10.00€ for fr_FR
@@ -20,13 +21,15 @@ interface ReportResult {
     eventLabel: string,
     totalTicketsCount: number,
     chargesRefundedCount: number,
-    totalAmountCharged: string,
-    totalAmountChargedBase: string,
+    totalChargedAmount: string,
+    totalChargedBaseAmount: string,
     totalsByTicketType: {
         [price_type: string]: {
             basePrice: string,
             ticketCount: number,
-            total: string
+            totalAmount: string,
+            netAmount: string,
+            compsCount: number,
         }
     }
 }
@@ -72,7 +75,9 @@ function processChargesWithMetadata(
         [price_type: string]: {
             basePriceAtomic: number,
             ticketCount: number,
-            totalAtomic: number
+            totalAtomic: number,
+            netAtominc: number,
+            compsCount: number,
         }
     } = {};
 
@@ -87,7 +92,7 @@ function processChargesWithMetadata(
             continue;
         }
 
-        if(!charge.paid){
+        if (!charge.paid) {
             continue;
         }
 
@@ -95,6 +100,7 @@ function processChargesWithMetadata(
             console.log(`charge ${charge.id} has no ticket_metadata`);
             continue;
         }
+
         totalAmountCharged += charge.amount;
         const ticketMetadata = JSON.parse(metadata.ticket_metadata) as ITicketMetadata[];
         ticketMetadata.sort((a, b) => a.base_price_major_units - b.base_price_major_units);
@@ -103,13 +109,20 @@ function processChargesWithMetadata(
             if (!totalsByTicketTypeAtomic[ticket.price_type]) {
                 totalsByTicketTypeAtomic[ticket.price_type] = {
                     basePriceAtomic: basePrice.atomicUnits,
+                    compsCount: 0,
                     ticketCount: 0,
-                    totalAtomic: 0
+                    totalAtomic: 0,
+                    netAtominc: 0,
                 };
             }
             totalTicketsCount++;
             totalsByTicketTypeAtomic[ticket.price_type].ticketCount++;
             totalsByTicketTypeAtomic[ticket.price_type].totalAtomic += basePrice.atomicUnits;
+            if (ticket.comp) {
+                totalsByTicketTypeAtomic[ticket.price_type].compsCount++;
+            } else {
+                totalsByTicketTypeAtomic[ticket.price_type].netAtominc += basePrice.atomicUnits;
+            }
             totalAmountChargedBaseAtomic += basePrice.atomicUnits;
         }
     }
@@ -119,14 +132,16 @@ function processChargesWithMetadata(
         eventLabel,
         totalTicketsCount,
         chargesRefundedCount,
-        totalAmountCharged: Money.fromAtomic(totalAmountCharged, currency).format(locale),
-        totalAmountChargedBase: Money.fromAtomic(totalAmountChargedBaseAtomic, currency).format(locale),
+        totalChargedAmount: Money.fromAtomic(totalAmountCharged, currency).format(locale),
+        totalChargedBaseAmount: Money.fromAtomic(totalAmountChargedBaseAtomic, currency).format(locale),
         totalsByTicketType: Object.fromEntries(
-            Object.entries(totalsByTicketTypeAtomic).map(([price_type, { basePriceAtomic, ticketCount, totalAtomic }]) => {
+            Object.entries(totalsByTicketTypeAtomic).map(([price_type, ticketTotals]) => {
                 return [price_type, {
-                    basePrice: Money.fromAtomic(basePriceAtomic, currency).format(locale),
-                    ticketCount,
-                    total: Money.fromAtomic(totalAtomic, currency).format(locale)
+                    basePrice: Money.fromAtomic(ticketTotals.basePriceAtomic, currency).format(locale),
+                    ticketCount: ticketTotals.ticketCount,
+                    totalAmount: Money.fromAtomic(ticketTotals.totalAtomic, currency).format(locale),
+                    netAmount: Money.fromAtomic(ticketTotals.netAtominc, currency).format(locale),
+                    compsCount: ticketTotals.compsCount,
                 }]
             })
         )
@@ -138,13 +153,13 @@ function exportReportResult(report: ReportResult): string {
 
     output += `Event: ${report.eventLabel}\n`;
     output += `Currency: ${report.currency}\n`;
-    output += `Total Amount Charged: ${report.totalAmountCharged}\n`;
-    output += `Total Amount Charged (Base): ${report.totalAmountChargedBase}\n`;
+    output += `Total Amount Charged: ${report.totalChargedAmount}\n`;
+    output += `Total Amount Charged (Base): ${report.totalChargedBaseAmount}\n`;
     output += `Charges Refunded Count: ${report.chargesRefundedCount}\n`;
     output += `Ticket Count: ${report.totalTicketsCount}\n\n`;
 
     output += `Breakdown by Ticket Type:\n`;
-    
+
     const sortedTotals = Object.entries(report.totalsByTicketType).sort(
         ([a], [b]) => a.localeCompare(b)
     )
@@ -153,7 +168,9 @@ function exportReportResult(report: ReportResult): string {
         output += `  Ticket Type: ${ticketType}\n`;
         output += `    Base Price: ${details.basePrice}\n`;
         output += `    Ticket Count: ${details.ticketCount}\n`;
-        output += `    Total: ${details.total}\n\n`;
+        output += `    TotalAmount: ${details.totalAmount}\n`;
+        output += `    Comps: ${details.compsCount}\n`;
+        output += `    Net Amount: ${details.netAmount}\n\n`;
     }
 
     return output;
