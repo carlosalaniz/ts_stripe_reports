@@ -66,7 +66,7 @@ interface ReportResult {
 ```
 
 ## Text based
-```txt
+```
 Event: india_yuridia.01
 Currency: USD
 Total Amount Charged: $18,935.86
