@@ -4,6 +4,17 @@ export interface ITicketSale {
     ticketMetadata: ITicketMetadata[]
 }
 
+export interface IEventInformation {
+    eventLabel: string;
+    eventDate: string;
+    eventTime: string;
+    eventLocation: string;
+    eventVenue: string;
+    generatedBy: string;
+    generatedOn: string;
+    eventName: string;
+}
+
 export interface IChargesMetadata  {
     event_label: string;
     tm: string;
@@ -25,6 +36,7 @@ export interface ReportResult {
     chargesRefundedCount: number,
     totalChargedAmount: string,
     totalChargedBaseAmount: string,
+    eventInformation: IEventInformation,
     totalsByTicketType: {
         [price_type: string]: {
             basePrice: string,
